@@ -1,12 +1,12 @@
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
-from .serializers import RegisterUserSerializer
+from .serializers import RegisterUserSerializer, UserSerializer
 from .models import User
 from django.conf import settings
 from django.core.mail import send_mail
 from config import Config
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
 from random_word import RandomWords
 from django.template.loader import render_to_string
 # from django.shortcuts import render
@@ -26,7 +26,7 @@ class Register(APIView):
         username = r.get_random_word()
         data['username'] = username
         data['password'] = hashed_password
-        cred = {'username':username, 'password':password, 'email':email}
+        cred = {'username':username, 'password':data['password'], 'email':email}
         encode = str(cred).encode('UTF-8')
         encoded = base64.b64encode(encode)
         print(str(encoded, 'UTF-8'),"encoded_data")
@@ -64,3 +64,24 @@ class UserVerification(APIView):
         if serializer.is_valid(raise_exception=True):
             serializer.save()
             return Response({"msg": "User data saved in database."})
+
+
+class LoginUser(APIView):
+    def post(self, request):
+        data = request.data
+        if data['username'] and data['password'] is not None:
+            try:
+                user = User.objects.get(username=data['username'])
+                if user.is_active:
+                    checkpswd = check_password(data['password'], user.password)
+                    serializer = UserSerializer(user)
+                    if checkpswd:
+                        return Response({
+                            "data": serializer.data
+                            })
+                else:
+                    return Response("Your account is disable.")
+            except Exception as e:
+                return Response({"msg": "Please provide valid username and password."})
+        else:
+            return Response({"msg": "Please provide your username and password."})
